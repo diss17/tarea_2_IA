@@ -27,7 +27,7 @@ ofstream reward_output;
 //////////////
 //Setting value for learning parameters
 int action_sel=2; // 1 is greedy, 2 is e-greedy
-int environment= 2; // 1 is small grid, 2 is Cliff walking
+int environment= 1; // 1 is small grid, 2 is Cliff walking
 int algorithm = 1; //1 is Q-learning, 2 is Sarsa
 int stochastic_actions=0; // 0 is deterministic actions, 1 for stochastic actions
 int num_episodes=3000; //total learning episodes
@@ -65,30 +65,22 @@ void Initialize_environment()
     }
     
     
-    
-    
-    
-    
     for(i=0; i < width_grid; i++)
     {
         for(j=0; j< height_grid; j++)
         {
-            
-            
             if(environment==1)
             {
-                reward[i][j]=-0.04; //-1 if environment 2
+                reward[i][j]=-0.04;
                 blocked[i][j]=0;
                 
             }
-            
             
             if(environment==2)
             {
                 reward[i][j]=-1;
                 blocked[i][j]=0;
             }
-            
             
             for(k=0; k<4; k++)
             {
@@ -102,8 +94,8 @@ void Initialize_environment()
     
     if(environment==1)
     {
-        reward[goalx][goaly]=100;
-        reward[goalx][(goaly-1)]=-100;
+        reward[goalx][goaly]=1.0;
+        reward[goalx][(goaly-1)]=-1.0;
         blocked[1][1]=1;
     }
     
@@ -120,23 +112,57 @@ void Initialize_environment()
     }
     
 }
-
+//PRINTEAR MATRIZ
+void print_reward_grid() {
+    printf("Matriz de recompensas:\n");
+    for(int y = height_grid - 1; y >= 0; y--) {
+        for(int x = 0; x < width_grid; x++) {
+            if(blocked[x][y] == 1) {
+                printf("  XX  ");
+            } else {
+                printf("%5.2f ", reward[x][y]);
+            }
+        }
+        printf("\n");
+    }
+}
 
 
 int action_selection()
 { // Based on the action selection method chosen, it selects an action to execute next
-    
 
     
     if(action_sel==1) //Greedy, always selects the action with the largest Q value
     {
         
-        return rand()%4; //Currently returing a random action, need to code the greedy strategy
+        int best_action = 0;
+        float best_value = Qvalues[x_pos][y_pos][0];
+        for(int a=1; a<4; a++) {
+            if(Qvalues[x_pos][y_pos][a] > best_value) {
+                best_value = Qvalues[x_pos][y_pos][a];
+                best_action = a;
+            }
+        }
+        return best_action;
     }
     
     if(action_sel==2)//epsilon-greedy, selects the action with the largest Q value with prob (1-exp_rate) and a random action with prob (exp_rate)
     {
-        return rand()%4; //Currently returing a random action, need to code the e-greedy strategy
+        float r = ((float) rand() / (RAND_MAX));
+        
+        if(r < exp_rate) {
+            return rand()%4; // Exploración
+        } else {
+            int best_action = 0;
+            float best_value = Qvalues[x_pos][y_pos][0];
+            for(int a=1; a<4; a++) {
+                if(Qvalues[x_pos][y_pos][a] > best_value) {
+                    best_value = Qvalues[x_pos][y_pos][a];
+                    best_action = a;
+                }
+            }
+            return best_action;
+        }
         
     }
     return 0;
@@ -207,19 +233,29 @@ void update_q_prev_state() //Updates the Q value of the previous state
     //Update the Q value of the previous state and action if the agent has not reached a terminal state
     if(!( ((x_pos==goalx)&&(y_pos==goaly)) ||((environment==1)&&(x_pos==goalx)&&(y_pos==(goaly-1)))||((environment==2)&&(x_pos>0)&&(x_pos<goalx)&&(y_pos==0))) )
     {
-        
-        
-        Qvalues[prev_x_pos][prev_y_pos][action_taken]= Qvalues[prev_x_pos][prev_y_pos][action_taken]; //How should the Q values be updated?
+        //Calcula el maximo del sigueinte estado
+        float maxQ = Qvalues[x_pos][y_pos][0];
+        //Acciones posibles
+        for (int actions = 1; actions < 4; actions++)
+        {
+            if (Qvalues[x_pos][y_pos][actions] > maxQ){
+                maxQ = Qvalues[x_pos][y_pos][actions];
+            }
+        }
+
+        //ECUACION Q VALUES Q(s, a) = Q(s, a) + α [r + γ * max_a' Q(s', a') - Q(s, a)]
+
+        Qvalues[prev_x_pos][prev_y_pos][action_taken]= Qvalues[prev_x_pos][prev_y_pos][action_taken]
+        + learn_rate *(reward[x_pos][y_pos] + disc_factor * maxQ - Qvalues[prev_x_pos][prev_y_pos][action_taken]);
 
     }
     else//Update the Q value of the previous state and action if the agent has reached a terminal state
     {
-        Qvalues[prev_x_pos][prev_y_pos][action_taken]=  Qvalues[prev_x_pos][prev_y_pos][action_taken];
+        //SI ES TERMINAL
+        Qvalues[prev_x_pos][prev_y_pos][action_taken]=  Qvalues[prev_x_pos][prev_y_pos][action_taken]
+        + learn_rate * (reward[x_pos][y_pos] - Qvalues[prev_x_pos][prev_y_pos][action_taken]);
 
     }
-    
-    
-    
 }
 
 void update_q_prev_state_sarsa()
@@ -240,15 +276,21 @@ void update_q_prev_state_sarsa()
 
 void Qlearning()
 {
-   //Follow the  steps in the pseudocode in the slides
+   // Seleccion de accion a ejecutar y se mueve
    move(action_selection());
+
+   //Recompensa
    cum_reward=cum_reward+reward[x_pos][y_pos]; //Add the reward obtained by the agent to the cummulative reward of the agent in the current episode
+    update_q_prev_state();    
 }
 
 void Sarsa()
 {
     move(action_selection());
     cum_reward=cum_reward+reward[x_pos][y_pos]; //Add the reward obtained by the agent to the cummulative reward of the agent in the current episode
+
+    //Actualizar Q value
+    update_q_prev_state();
     
     
 }
@@ -283,20 +325,16 @@ void Multi_print_grid()
 int main(int argc, char* argv[])
 {
     srand(time(NULL));
-    
-    reward_output.open("Rewards.txt", ios_base::app);
     Initialize_environment();//Initialize the features of the chosen environment (goal and initial position, obstacles, rewards)
-
+    print_reward_grid();
     for(i=0;i<num_episodes;i++)
     {
-        cout << "\n \n Episode " << i;
+        //cout << "\n \n Episode " << i;
         current_episode=i;
         x_pos=init_x_pos;
         y_pos=init_y_pos;
         cum_reward=0;
 
-       
-        
         //If Sarsa was chosen as the algorithm:
         if(algorithm==2)
         {
@@ -309,7 +347,6 @@ int main(int argc, char* argv[])
         {
             if(algorithm==1)
             {
-                
             Qlearning();
             }
             if(algorithm==2)
@@ -320,12 +357,15 @@ int main(int argc, char* argv[])
         }
 
         finalrw[i]=cum_reward;
-        cout << " Total reward obtained: " <<finalrw[i] <<"\n";
-        
-       
-        
+        //cout << " Total reward obtained: " <<finalrw[i] <<"\n";      
     }
-    reward_output.close();
+    // Generar el CSV con episodios y recompensas
+    std::ofstream csv_output("rewards_per_episode.csv");
+    csv_output << "episode,reward_obtained\n";
+    for(int ep=0; ep<num_episodes; ep++) {
+        csv_output << ep << "," << finalrw[ep] << "\n";
+    }
+    csv_output.close();
 
     return 0;
 }
