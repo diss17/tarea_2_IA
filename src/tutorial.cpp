@@ -231,7 +231,6 @@ void update_q_prev_state() // Updates the Q value of the previous state
                 maxQ = Qvalues[x_pos][y_pos][actions];
             }
         }
-
         // ECUACION Q VALUES Q(s, a) = Q(s, a) + α [r + γ * max_a' Q(s', a') - Q(s, a)]
 
         Qvalues[prev_x_pos][prev_y_pos][action_taken] = Qvalues[prev_x_pos][prev_y_pos][action_taken] + learn_rate * (reward[x_pos][y_pos] + disc_factor * maxQ - Qvalues[prev_x_pos][prev_y_pos][action_taken]);
@@ -349,7 +348,6 @@ int main(int argc, char *argv[])
         }
 
         finalrw[i] = cum_reward;
-        // cout << " Total reward obtained: " <<finalrw[i] <<"\n";
     }
     // Generar el CSV con episodios y recompensas
     std::ofstream csv_output("sarsa_env2_sto.csv");
